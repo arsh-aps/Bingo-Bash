@@ -1,0 +1,264 @@
+#!/bin/bash
+#source: LINUX
+#Assignment 1
+#Member1: mmuhtadi, Muhtadi, Maher, 501061285, Section 07
+#Member2: a363sing, Singh, Arshpreet, 501030338, Section 09
+#a bash program to play a game called LINUX (much like BINGO)
+
+#error handling
+#exit 1
+if [ -z $1 ] #checks if file argument provided
+then
+	echo "input file missing or unreadable" > /dev/stderr
+	exit 1
+elif [ ! -r $1 ] #checks if file is readable
+then
+	echo "input file missing or unreadable" > /dev/stderr
+	exit 1
+fi
+
+#exit 2
+typeset -i line_counter_a=0
+while IFS= read -r text
+do
+
+	line_counter_a+=1
+done < $1
+if [ $line_counter_a != 6 ]
+then
+	echo "input file must have 6 lines" > /dev/stderr
+	exit 2
+fi
+
+#exit 3
+digits='^[0-9]+$'
+typeset -i line_counter_b=0
+while IFS= read -r text
+do
+	if [ $line_counter_b -eq 0 ] #checks first line
+	then
+		if ! [[ $text =~ $digits ]]
+		then
+			echo "seed line format error" > /dev/stderr
+			exit 3
+		fi
+	fi
+	line_counter_b+=1
+done < $1
+
+#exit 4
+typeset -i num_counter=0
+typeset -i line_counter_c=0
+while IFS= read -r text
+do
+	for number in $text
+	do
+		if ! [[ $number =~ $digits ]] #checks if each number is numeric
+		then
+			echo "card format error" > /dev/stderr
+			exit 4
+		fi
+		if [ $line_counter_c -gt 0 ]
+		then
+			if [ ${#number} != 2 ] #checks if each number except seed is 2 digits
+			then
+				echo "card format error" > /dev/stderr
+				exit 4
+			fi
+		fi
+		num_counter+=1
+	done
+	line_counter_c+=1
+done < $1
+if [ $num_counter != 26 ] #checks if correct number of elements in card file
+then
+	echo "card format error" > /dev/stderr
+	exit 4
+fi
+
+#the code below reads and stores the numbers from file argument
+declare -a numbers[26]
+typeset -i index=0
+while IFS= read -r line
+do
+	for number in $line
+	do
+		numbers[$index]=$number
+		index+=1
+	done
+done < "$1"
+
+RANDOM=${numbers[0]}
+numbers=("${numbers[@]:1}") #slicing off the seed
+numbers[12]="${numbers[12]}m"
+
+#this function generates the card
+print_card () {
+	echo "L   I   N   U   X"
+	for i in {0..4}
+	do
+		local row=""
+		for j in {0..4}
+		do
+			if [[ "${numbers[$(($j + $i * 5))]}" =~ .*"m".* ]]
+			then
+				row+="${numbers[$(($j + $i * 5))]} "
+			else
+				row+="${numbers[$(($j + $i * 5))]}  "
+			fi
+		done
+		echo "$row"
+	done
+}
+
+#this function searches the argument number in the card and marks the number that matches
+#ARGS: a number to be searched in card
+search_card () {
+	local item=$1
+	if [ $1 -le 9 ]
+	then
+		item="0$1"
+	fi
+	for i in {0..24}
+	do
+		if [ ${numbers[$i]} = $item ]
+		then
+			numbers[$i]="${numbers[$i]}m"
+			break
+		fi
+	done
+}
+
+#this function checks each row to see if all numbers in a row are marked
+check_row_m () {
+	for i in {0..4}
+	do
+		local row=""
+		for j in {0..4}
+		do
+			row+="${numbers[$(($j + $i * 5))]}"
+		done
+		
+		typeset -i local m_count=0
+		for ((i=0; i<${#row}; i++))
+		do
+			if [ ${row:i:1} = "m" ]
+			then
+				m_count+=1
+			fi
+		done
+
+		if [ $m_count -eq 5 ]
+		then
+			return 0
+		fi
+	done
+	return 1
+}
+
+#this function checks each column to see if all numbers in a column are marked
+check_column_m () {
+	for i in {0..4}
+	do
+		local column=""
+		for j in {0..4}
+		do
+			column+="${numbers[$(($i + $j * 5))]}"
+		done
+		
+		typeset -i local m_count=0
+		for ((i=0; i<${#column}; i++))
+		do
+			if [ ${column:i:1} = "m" ]
+			then
+				m_count+=1
+			fi
+		done
+
+		if [ $m_count -eq 5 ]
+		then
+			return 0
+		fi
+	done
+	return 1
+}
+
+#this function checks each corner to see if all numbers in the corners are marked
+check_corner_m () {
+	if [[ "${numbers[0]}" =~ .*"m".* ]] && [[ "${numbers[4]}" =~ .*"m".* ]] \
+	&& [[ "${numbers[20]}" =~ .*"m".* ]] && [[ "${numbers[24]}" =~ .*"m".* ]]
+	then
+		return 0
+	fi
+	return 1
+}
+
+#checks if won
+check_winner () {
+	if `check_row_m` || `check_column_m` || `check_corner_m`
+	then
+		return 0
+	fi
+	return 1
+}
+
+#adds the column prefix to the number call by taking the call in as argument
+#ARGS: the call number
+prefix () {
+	local num=$1
+	if [ $num -ge 1 -a $num -le 15 ]
+	then
+		if [ $num -le 9 ]
+		then
+			echo "L0$num"
+		else
+			echo "L$num"
+		fi
+	elif [ $num -ge 16 -a $num -le 30 ]
+	then
+		echo "I$num"
+	elif [ $num -ge 31 -a $num -le 45 ]
+	then
+		echo "N$num"
+	elif [ $num -ge 46 -a $num -le 60 ]
+	then
+		echo "U$num"
+	elif [ $num -ge 61 -a $num -le 75 ]
+	then
+		echo "X$num"
+	fi
+}
+
+#plays the game
+declare -a call_history=()
+called=""
+echo "CALL LIST:"
+print_card
+echo -n "Enter any key to get a call or q to quit: "
+while read char
+do
+	if [ $char != "q" ]
+	then
+		clear
+		call=$((1 + $RANDOM % 75))
+		while [[ " ${call_history[*]} " =~ " $call " ]]
+		do
+			call=$((1 + $RANDOM % 75))
+		done
+		call_history+=("$call")
+		called+=" $(prefix $call)"
+		
+		search_card $call
+		echo "CALL LIST:$called"
+		print_card
+		if `check_winner`
+		then
+			echo WINNER
+			exit 0
+		fi
+		echo -n "Enter any key to get a call or q to quit: "
+	elif [ $char = "q" ]
+	then
+		exit 0
+	fi
+done
