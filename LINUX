@@ -1,8 +1,5 @@
 #!/bin/bash
 #source: LINUX
-#Assignment 1
-#Member1: mmuhtadi, Muhtadi, Maher, 501061285, Section 07
-#Member2: a363sing, Singh, Arshpreet, 501030338, Section 09
 #a bash program to play a game called LINUX (much like BINGO)
 
 #error handling
